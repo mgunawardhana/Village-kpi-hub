@@ -413,8 +413,8 @@ const Dashboard = () => {
                             value: `${stats.avgDefectRate}%`,
                             sub: "Overall average"
                         },
-                        { title: "Meetings", icon: Users, value: "0", sub: "Quality Circle" },
-                        { title: "Awards", icon: Award, value: "0", sub: "Recognition" }
+                        { title: "Meetings", icon: Users, value: "3", sub: "Quality Circle" },
+                        { title: "Awards", icon: Award, value: "5", sub: "Recognition" }
                     ].map((stat, i) => (
                         <Card key={i} className="group bg-[#1C1917] border border-amber-500/20 rounded-[24px] shadow-lg hover:shadow-[0_20px_40px_-12px_rgba(245,158,11,0.15)] hover:border-amber-500/40 transition-all duration-500 relative overflow-hidden">
                             <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
