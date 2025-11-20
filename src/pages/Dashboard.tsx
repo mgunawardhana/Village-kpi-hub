@@ -43,6 +43,13 @@ const Dashboard = () => {
     const [departmentSelection, setDepartmentSelection] = useState<string>("");
     const [savingDepartment, setSavingDepartment] = useState(false);
     const [loading, setLoading] = useState(true);
+
+    // Stats state for the cards
+    const [stats, setStats] = useState({
+        totalRecords: 0,
+        avgDefectRate: "0.00"
+    });
+
     const navigate = useNavigate();
     const { toast } = useToast();
 
@@ -71,6 +78,53 @@ const Dashboard = () => {
             fetchProfile();
         }
     }, [user]);
+
+    // Trigger stats fetch when profile or role is loaded
+    useEffect(() => {
+        if (profile?.department || userRole === 'admin') {
+            fetchStats();
+        }
+    }, [profile, userRole]);
+
+    const fetchStats = async () => {
+        try {
+            // Start building the query
+            let query = supabase
+                .from("kpi_records")
+                .select("defect_percentage", { count: "exact" });
+
+            // Filter by department if the user has one (and is not viewing as a global admin without dept context)
+            if (profile?.department) {
+                query = query.eq("department", profile.department);
+            }
+
+            const { data, count, error } = await query;
+
+            if (error) throw error;
+
+            // Calculate Average Defect Rate
+            let avg = "0.00";
+            if (data && data.length > 0) {
+                // Extract valid numbers from the response
+                const validPercentages = data
+                    .map(record => Number(record.defect_percentage))
+                    .filter(val => !isNaN(val));
+
+                if (validPercentages.length > 0) {
+                    const totalDefectPercentage = validPercentages.reduce((sum, val) => sum + val, 0);
+                    avg = (totalDefectPercentage / validPercentages.length).toFixed(2);
+                }
+            }
+
+            setStats({
+                totalRecords: count || 0,
+                avgDefectRate: avg
+            });
+
+        } catch (error) {
+            console.error("Error fetching dashboard stats:", error);
+        }
+    };
 
     const fetchProfile = async () => {
         try {
@@ -174,10 +228,9 @@ const Dashboard = () => {
     const effectiveRole = userRole || profile?.role || "";
 
     return (
-        // BACKGROUND: Deeper "Warm Stone" (#E6E4DF) to reduce whiteness and create contrast
         <div className="min-h-screen bg-[#E6E4DF] text-stone-900 font-sans selection:bg-amber-200 pb-20">
 
-            {/* Decorative Top Gradient - Subtle Gold/Stone blend */}
+            {/* Decorative Top Gradient */}
             <div className="h-80 w-full bg-gradient-to-b from-[#D6D4CF] to-[#E6E4DF] absolute top-0 left-0 z-0 pointer-events-none border-b border-white/10" />
 
             <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
@@ -186,7 +239,6 @@ const Dashboard = () => {
                 <header className="py-8 mb-6">
                     <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                         <div className="flex items-center gap-4">
-                            {/* Logo container: Dark Stone for contrast */}
                             <div className="p-3 bg-[#1C1917] rounded-xl shadow-lg border border-amber-900/20">
                                 <Crown className="w-6 h-6 text-amber-500" />
                             </div>
@@ -200,7 +252,6 @@ const Dashboard = () => {
                             </div>
                         </div>
 
-                        {/* User Profile & Logout Pill - Warmer Background */}
                         <div className="bg-[#F5F5F4] p-2 pl-6 rounded-full shadow-md border border-stone-200 flex items-center gap-6">
                             <div className="text-right hidden sm:block">
                                 <p className="text-sm font-serif font-bold text-stone-900 leading-none mb-1">{profile?.full_name}</p>
@@ -219,10 +270,9 @@ const Dashboard = () => {
                     </div>
                 </header>
 
-                {/* Welcome Section - DARK CARD to break up the white */}
+                {/* Welcome Section */}
                 <div className="mb-10">
                     <Card className="bg-[#1C1917] border border-stone-800 rounded-[24px] shadow-2xl overflow-hidden relative group">
-                        {/* Subtle Gold Glow */}
                         <div className="absolute top-0 right-0 w-96 h-96 bg-amber-600/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none group-hover:bg-amber-600/20 transition-all duration-1000" />
 
                         <CardContent className="p-8 relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 text-white">
@@ -250,7 +300,7 @@ const Dashboard = () => {
                     </Card>
                 </div>
 
-                {/* Department Setup - Only shows if needed */}
+                {/* Department Setup */}
                 {!profile?.department && (
                     <div className="mb-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
                         <Card className="bg-[#F5F5F4] border-l-4 border-l-amber-600 border-y border-r border-stone-200 rounded-r-[24px] rounded-l-md shadow-xl">
@@ -294,7 +344,6 @@ const Dashboard = () => {
                 <div className="mb-12">
                     <div className="flex items-center justify-between mb-6">
                         <div className="flex items-center gap-3">
-                            {/* GOLD GRADIENT BAR - Modern Luxury Fix */}
                             <div className="h-8 w-1.5 bg-gradient-to-b from-amber-300 via-amber-500 to-amber-700 rounded-full shadow-[0_0_10px_rgba(245,158,11,0.5)]" />
                             <h3 className="text-2xl font-serif text-[#1C1917]">Performance Metrics</h3>
                         </div>
@@ -343,23 +392,31 @@ const Dashboard = () => {
                         )}
                     </div>
 
-                    {/* Chart Container: Off-White BG to contrast with the darker Page BG */}
                     <div className="bg-[#F5F5F4] border border-stone-200 rounded-[24px] shadow-xl p-6 overflow-hidden relative">
                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-200 via-amber-500 to-amber-200 opacity-30"></div>
                         <KPIOverview department={profile?.department} />
                     </div>
                 </div>
 
-                {/* Quick Stats - DARK & GOLD CARDS (Updated per screenshot request) */}
+                {/* Quick Stats - Updated to use real data */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
                     {[
-                        { title: "Total Records", icon: BarChart3, value: "0", sub: "Current Month" },
-                        { title: "Defect Rate", icon: TrendingUp, value: "--%", sub: "Average" },
+                        {
+                            title: "Total Records",
+                            icon: BarChart3,
+                            value: stats.totalRecords.toString(),
+                            sub: "Total entries in table"
+                        },
+                        {
+                            title: "Defect Rate",
+                            icon: TrendingUp,
+                            value: `${stats.avgDefectRate}%`,
+                            sub: "Overall average"
+                        },
                         { title: "Meetings", icon: Users, value: "0", sub: "Quality Circle" },
                         { title: "Awards", icon: Award, value: "0", sub: "Recognition" }
                     ].map((stat, i) => (
                         <Card key={i} className="group bg-[#1C1917] border border-amber-500/20 rounded-[24px] shadow-lg hover:shadow-[0_20px_40px_-12px_rgba(245,158,11,0.15)] hover:border-amber-500/40 transition-all duration-500 relative overflow-hidden">
-                            {/* Subtle gradient overlay on hover */}
                             <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
                             <CardHeader className="flex flex-row items-center justify-between pb-2 pt-6 px-6 relative z-10">
@@ -369,7 +426,6 @@ const Dashboard = () => {
                                 </div>
                             </CardHeader>
                             <CardContent className="px-6 pb-6 relative z-10">
-                                {/* Text Gradient for numbers to look metallic/gold */}
                                 <div className="text-4xl font-serif mb-1 tracking-tight bg-gradient-to-br from-white to-stone-400 bg-clip-text text-transparent group-hover:from-amber-200 group-hover:to-amber-500 transition-all duration-500">{stat.value}</div>
                                 <p className="text-xs text-stone-500 font-medium italic group-hover:text-stone-400 transition-colors">{stat.sub}</p>
                             </CardContent>
@@ -380,7 +436,6 @@ const Dashboard = () => {
                 {/* Variance Chart */}
                 <div className="mb-12">
                     <div className="flex items-center gap-3 mb-6">
-                        {/* GOLD GRADIENT BAR - Modern Luxury Fix */}
                         <div className="h-8 w-1.5 bg-gradient-to-b from-amber-300 via-amber-500 to-amber-700 rounded-full shadow-[0_0_10px_rgba(245,158,11,0.5)]" />
                         <h3 className="text-2xl font-serif text-[#1C1917]">Variance Analysis</h3>
                     </div>
@@ -392,7 +447,6 @@ const Dashboard = () => {
                 {/* KPI Records Table */}
                 <div className="mb-12">
                     <div className="flex items-center gap-3 mb-6">
-                        {/* GOLD GRADIENT BAR - Modern Luxury Fix */}
                         <div className="h-8 w-1.5 bg-gradient-to-b from-amber-300 via-amber-500 to-amber-700 rounded-full shadow-[0_0_10px_rgba(245,158,11,0.5)]" />
                         <h3 className="text-2xl font-serif text-[#1C1917]">Data Archives</h3>
                     </div>
@@ -401,11 +455,10 @@ const Dashboard = () => {
                     </div>
                 </div>
 
-                {/* KPI Entry Form - Dark Mode Luxury Section */}
+                {/* KPI Entry Form */}
                 {effectiveRole && profile?.department && (
                     <div className="mb-12">
                         <div className="bg-[#1C1917] rounded-[24px] p-8 text-white shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] relative overflow-hidden border-t border-white/10">
-                            {/* Background Texture */}
                             <div className="absolute inset-0 opacity-20" style={{backgroundImage: "url('https://www.transparenttextures.com/patterns/cubes.png')"}}></div>
                             <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-amber-900/20 rounded-full blur-[100px] -mr-40 -mt-40 pointer-events-none"></div>
 
@@ -452,10 +505,10 @@ const Dashboard = () => {
                                     className="w-full justify-between group h-14 rounded-xl border-stone-200 bg-white text-stone-600 hover:border-amber-500 hover:bg-[#1C1917] hover:text-amber-50 transition-all duration-300 shadow-sm"
                                     onClick={item.action}
                                 >
-                  <span className="flex items-center gap-3 font-medium">
-                    <item.icon className="w-4 h-4 text-stone-400 group-hover:text-amber-500" />
-                      {item.label}
-                  </span>
+                                  <span className="flex items-center gap-3 font-medium">
+                                    <item.icon className="w-4 h-4 text-stone-400 group-hover:text-amber-500" />
+                                      {item.label}
+                                  </span>
                                     <ArrowRight className="w-4 h-4 text-stone-300 group-hover:translate-x-1 group-hover:text-amber-500 transition-all" />
                                 </Button>
                             ))}
@@ -479,10 +532,10 @@ const Dashboard = () => {
                                 { label: "Quality Circle Minutes", icon: ShieldCheck }
                             ].map((item, idx) => (
                                 <Button key={idx} variant="outline" className="w-full justify-between group h-14 rounded-xl border-stone-200 bg-white text-stone-600 hover:border-amber-500 hover:bg-[#1C1917] hover:text-amber-50 transition-all duration-300 shadow-sm">
-                  <span className="flex items-center gap-3 font-medium">
-                    <item.icon className="w-4 h-4 text-stone-400 group-hover:text-amber-500" />
-                      {item.label}
-                  </span>
+                                  <span className="flex items-center gap-3 font-medium">
+                                    <item.icon className="w-4 h-4 text-stone-400 group-hover:text-amber-500" />
+                                      {item.label}
+                                  </span>
                                     <ArrowRight className="w-4 h-4 text-stone-300 group-hover:translate-x-1 group-hover:text-amber-500 transition-all" />
                                 </Button>
                             ))}
